@@ -7,32 +7,62 @@
 }
 
 body {
-  background-color: #f4f4f4;
+  background-color: #f0f0f0;
+  height: 100vh;
 }
 
+/* Sign-out Button Container */
 .auth-container {
+  position: absolute;
+  top: 20px;
+  right: 30px;
   display: flex;
-  justify-content: flex-end;
-  padding: 20px;
+  justify-content: center;
+  align-items: center;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+
+.sign-out-button {
+  padding: 10px 15px;
+  background-color: #f44336;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.sign-out-button:hover {
+  background-color: #d32f2f;
 }
 
 /* Main Container */
 .container {
   display: flex;
   justify-content: space-between;
-  width: 100%;
-  max-width: 1200px;
+  width: 100vw; /* Full width */
+  height: 85vh;
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
   padding: 20px;
-  background-color: #fff;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
+  margin-top: 60px; /* Push container down to avoid overlap with header */
 }
 
 /* Sidebar */
 .sidebar {
-  width: 250px;
+  width: 300px; /* Slightly larger for better file viewing */
+  background-color: #f7f7f7;
+  padding: 20px;
   border-right: 2px solid #eaeaea;
-  padding-right: 20px;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar h2 {
@@ -43,14 +73,18 @@ body {
 
 .file-list {
   list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  flex-grow: 1;
 }
 
 .file-item {
   background-color: #007bff;
   color: white;
-  padding: 10px;
+  padding: 12px;
   margin-bottom: 10px;
-  border-radius: 5px;
+  border-radius: 8px;
   border: none;
   cursor: pointer;
   text-align: left;
@@ -66,37 +100,43 @@ body {
 }
 
 .file-input {
-  display: block;
   margin-top: 20px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ced4da;
+  background-color: #fff;
+  cursor: pointer;
 }
 
-/* Chatbox */
+/* Chat Interface */
 .chatbot {
   flex-grow: 1;
-  padding-left: 20px;
-}
-
-.chatbox {
-  width: 100%;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-}
-
-.chatbox h2 {
-  font-size: 1.5em;
-  color: #333;
-  margin-bottom: 20px;
-}
-
-/* Chat Messages */
-.chatbox-messages {
-  background-color: #f9f9f9;
   padding: 20px;
+  width: calc(100% - 320px); /* Take the remaining width after sidebar */
+}
+
+.chatbox-header {
+  font-size: 1.8em;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.chatbox-messages {
+  flex-grow: 1;
+  padding: 15px;
+  background-color: #f9f9f9;
   border: 1px solid #ddd;
   border-radius: 8px;
-  height: 400px;
   overflow-y: auto;
+  margin-bottom: 10px;
+  height: 60vh; /* Fixed height for chat messages */
 }
 
 .chat-message {
@@ -108,7 +148,7 @@ body {
   margin-left: auto;
   text-align: right;
   background-color: #d1e7dd;
-  padding: 10px;
+  padding: 12px;
   border-radius: 8px;
   color: #155724;
   max-width: 70%;
@@ -117,13 +157,12 @@ body {
 .bot-message p {
   text-align: left;
   background-color: #f8d7da;
-  padding: 10px;
+  padding: 12px;
   border-radius: 8px;
   color: #721c24;
   max-width: 70%;
 }
 
-/* Empty Chatbox */
 .empty-chatbox {
   text-align: center;
   font-size: 1.2em;
@@ -131,7 +170,6 @@ body {
   padding: 20px;
 }
 
-/* Chatbox Input */
 .chatbox-input {
   display: flex;
   margin-top: 10px;
@@ -139,7 +177,7 @@ body {
 
 .chatbox-input input {
   flex: 1;
-  padding: 10px;
+  padding: 12px;
   border-radius: 8px;
   border: 1px solid #ced4da;
   font-size: 16px;
@@ -150,11 +188,11 @@ body {
 }
 
 .chatbox-input button {
-  padding: 10px;
+  padding: 12px 20px;
   background-color: #007bff;
   color: white;
   border: none;
-  border-radius: 5px;
+  border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.3s ease;
 }
@@ -173,18 +211,27 @@ body {
   color: #333;
 }
 
-/* Progress Bar Styles (if applicable) */
-progress {
-  width: 100%;
-  height: 10px;
-  border-radius: 5px;
-  overflow: hidden;
-}
+/* Responsive */
+@media (max-width: 1200px) {
+  .container {
+    flex-direction: column;
+    height: auto;
+    width: 100%;
+  }
 
-progress::-webkit-progress-bar {
-  background-color: #f4f4f4;
-}
+  .sidebar {
+    width: 100%;
+    padding: 15px;
+    border-right: none;
+    border-bottom: 2px solid #eaeaea;
+  }
 
-progress::-webkit-progress-value {
-  background-color: #28a745;
+  .chatbot {
+    width: 100%;
+    padding: 15px;
+  }
+
+  .file-input {
+    width: 100%;
+  }
 }
