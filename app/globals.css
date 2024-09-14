@@ -1,27 +1,190 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* General Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Arial", sans-serif;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #f4f4f4;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+.auth-container {
+  display: flex;
+  justify-content: flex-end;
+  padding: 20px;
+}
+
+/* Main Container */
+.container {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1200px;
+  padding: 20px;
+  background-color: #fff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 250px;
+  border-right: 2px solid #eaeaea;
+  padding-right: 20px;
+}
+
+.sidebar h2 {
+  font-size: 1.5em;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.file-list {
+  list-style: none;
+}
+
+.file-item {
+  background-color: #007bff;
+  color: white;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.3s ease;
+}
+
+.file-item-active {
+  background-color: #17a2b8;
+}
+
+.file-item:hover {
+  background-color: #0056b3;
+}
+
+.file-input {
+  display: block;
+  margin-top: 20px;
+}
+
+/* Chatbox */
+.chatbot {
+  flex-grow: 1;
+  padding-left: 20px;
+}
+
+.chatbox {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.chatbox h2 {
+  font-size: 1.5em;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+/* Chat Messages */
+.chatbox-messages {
+  background-color: #f9f9f9;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  height: 400px;
+  overflow-y: auto;
+}
+
+.chat-message {
+  margin-bottom: 10px;
+  display: flex;
+}
+
+.user-message p {
+  margin-left: auto;
+  text-align: right;
+  background-color: #d1e7dd;
+  padding: 10px;
+  border-radius: 8px;
+  color: #155724;
+  max-width: 70%;
+}
+
+.bot-message p {
+  text-align: left;
+  background-color: #f8d7da;
+  padding: 10px;
+  border-radius: 8px;
+  color: #721c24;
+  max-width: 70%;
+}
+
+/* Empty Chatbox */
+.empty-chatbox {
+  text-align: center;
+  font-size: 1.2em;
+  color: #777;
+  padding: 20px;
+}
+
+/* Chatbox Input */
+.chatbox-input {
+  display: flex;
+  margin-top: 10px;
+}
+
+.chatbox-input input {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ced4da;
+  font-size: 16px;
+}
+
+.chatbox-input input:focus {
+  border-color: #007bff;
+}
+
+.chatbox-input button {
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.chatbox-input button:hover {
+  background-color: #0056b3;
+}
+
+/* Loader */
+.loader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100px;
+  font-size: 1.2em;
+  color: #333;
+}
+
+/* Progress Bar Styles (if applicable) */
+progress {
+  width: 100%;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+progress::-webkit-progress-bar {
+  background-color: #f4f4f4;
+}
+
+progress::-webkit-progress-value {
+  background-color: #28a745;
 }

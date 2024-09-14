@@ -1,101 +1,238 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect } from "react";
+import AuthButton from "./components/AuthButton";
+import useAuth from "./hooks/useAuth";
+import { useFirestore } from "./hooks/useFirestore";
+import { extractTextFromFile } from "./services/aws/textract";
+import Loader from "./components/Loader";
+
+interface UploadedFile {
+  fileName: string;
+  extractedText: string;
+}
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const { user } = useAuth();
+  const {
+    uploadFileMetadata,
+    fetchUserFiles,
+    storeChatHistory,
+    listenToChatHistory,
+  } = useFirestore();
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(
+    null
+  );
+  const [isProcessing, setIsProcessing] = useState<boolean>(false); // Loader for file upload
+  const [chatResponse, setChatResponse] = useState<string>(""); // For the current bot response stream
+  const [userQuestion, setUserQuestion] = useState<string>(""); // The user's question
+  const [chatHistory, setChatHistory] = useState<any[]>([]); // Stores both user and bot messages
+  const [loadingHistory, setLoadingHistory] = useState<boolean>(false); // Loader for chat history
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    if (user) {
+      loadUserFiles();
+    }
+  }, [user]);
+
+  // Load user files and set the first file selected
+  const loadUserFiles = async () => {
+    if (user) {
+      const files = await fetchUserFiles(user.uid);
+      setUploadedFiles(files);
+      if (files.length > 0) {
+        setSelectedFileIndex(0); // Automatically select the first file
+      }
+    }
+  };
+
+  // Set up real-time chat listener for the selected file
+  useEffect(() => {
+    if (selectedFileIndex !== null && user) {
+      setLoadingHistory(true); // Show loader while fetching chat history
+      const selectedFile = uploadedFiles[selectedFileIndex];
+      const unsubscribe = listenToChatHistory(
+        user.uid,
+        selectedFile.fileName,
+        (chats) => {
+          setChatHistory(chats); // Update chat history with both user and bot messages
+          setLoadingHistory(false); // Hide loader once chat history is fetched
+        }
+      );
+
+      return () => unsubscribe(); // Cleanup listener on component unmount or file change
+    }
+  }, [selectedFileIndex, uploadedFiles]);
+
+  // Handle file upload and store extracted text
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      setIsProcessing(true);
+      try {
+        const extractedText = await extractTextFromFile(file);
+        await uploadFileMetadata(user.uid, file.name, extractedText); // Upload metadata
+        setUploadedFiles((prevFiles) => [
+          ...prevFiles,
+          { fileName: file.name, extractedText },
+        ]);
+        if (uploadedFiles.length === 0) setSelectedFileIndex(0); // Select first file if it's the only file
+        alert("File uploaded and extracted successfully!");
+      } catch (error) {
+        console.error("Error uploading file:", error);
+        alert("Error uploading file");
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+  };
+
+  // Handle chat submission and store both user and bot chat messages in Firestore
+  const handleChatSubmit = async () => {
+    if (userQuestion.trim() && selectedFileIndex !== null) {
+      const selectedFile = uploadedFiles[selectedFileIndex];
+      setIsProcessing(true); // Show loader while sending the question
+      try {
+        // Store the user's question in Firestore
+        await storeChatHistory(
+          user.uid,
+          selectedFile.fileName,
+          userQuestion,
+          "user"
+        );
+
+        // Clear the input field after submission
+        setUserQuestion("");
+
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            extractedText: selectedFile.extractedText,
+            userQuestion,
+          }),
+        });
+
+        if (!response.body) {
+          throw new Error("Response body is not available.");
+        }
+
+        const reader = response.body.getReader(); // Start reading the stream
+        let text = "";
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          text += decoder.decode(value, { stream: true });
+          setChatResponse(text); // Update chat response in real-time
+        }
+
+        // Remove "response" key and display only the message
+        const parsedResponse = JSON.parse(text);
+        const botResponse = parsedResponse.response;
+
+        // Store the bot's response in Firestore
+        await storeChatHistory(
+          user.uid,
+          selectedFile.fileName,
+          botResponse,
+          "bot"
+        );
+      } catch (error) {
+        console.error("Error with chat:", error);
+      } finally {
+        setIsProcessing(false); // Hide loader after processing
+      }
+    }
+  };
+
+  return (
+    <div>
+      <div className="auth-container">
+        <AuthButton />
+      </div>
+      <div className="container">
+        <div className="sidebar">
+          <h2>Uploaded Files</h2>
+          {isProcessing ? (
+            <Loader />
+          ) : (
+            <>
+              <ul className="file-list">
+                {uploadedFiles.map((file, index) => (
+                  <li key={file.fileName}>
+                    <button
+                      className={`file-item ${
+                        index === selectedFileIndex ? "file-item-active" : ""
+                      }`}
+                      onClick={() => setSelectedFileIndex(index)}
+                    >
+                      {file.fileName}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <input
+                type="file"
+                onChange={handleFileChange}
+                className="file-input"
+              />
+            </>
+          )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        <div className="chatbot">
+          <h2>Chatbot</h2>
+          <div className="chatbox">
+            {loadingHistory ? (
+              <Loader /> // Show loader while fetching chat history
+            ) : (
+              <div className="chatbox-messages">
+                {selectedFileIndex !== null ? (
+                  <>
+                    {chatHistory.map((chat, index) => (
+                      <div
+                        key={index}
+                        className={`chat-message ${
+                          chat.sender === "user"
+                            ? "user-message"
+                            : "bot-message"
+                        }`}
+                      >
+                        <p>
+                          <strong>
+                            {chat.sender === "user" ? "You" : "Bot"}:
+                          </strong>{" "}
+                          {chat.message}
+                        </p>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <div className="empty-chatbox">
+                    Please upload a document to start chatting.
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="chatbox-input">
+              <input
+                type="text"
+                value={userQuestion}
+                onChange={(e) => setUserQuestion(e.target.value)}
+                placeholder="Ask a question..."
+                disabled={selectedFileIndex === null}
+              />
+              <button
+                onClick={handleChatSubmit}
+                disabled={selectedFileIndex === null}
+              >
+                Ask GPT-4
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
