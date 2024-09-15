@@ -1,10 +1,13 @@
 "use client";
 import { useState, useEffect } from "react";
+import { Upload, Button, message, Spin } from "antd";
+import { UploadOutlined } from "@ant-design/icons";
 import AuthButton from "./components/AuthButton";
 import useAuth from "./hooks/useAuth";
 import { useFirestore } from "./hooks/useFirestore";
 import { extractTextFromFile } from "./services/aws/textract";
 import Loader from "./components/Loader";
+import "antd/dist/reset.css";
 
 interface UploadedFile {
   fileName: string;
@@ -23,11 +26,13 @@ export default function Home() {
   const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(
     null
   );
-  const [isProcessing, setIsProcessing] = useState<boolean>(false); // Loader for file upload
-  const [chatResponse, setChatResponse] = useState<string>(""); // For the current bot response stream
-  const [userQuestion, setUserQuestion] = useState<string>(""); // The user's question
-  const [chatHistory, setChatHistory] = useState<any[]>([]); // Stores both user and bot messages
-  const [loadingHistory, setLoadingHistory] = useState<boolean>(false); // Loader for chat history
+  const [isUploading, setIsUploading] = useState<boolean>(false); // State for file upload loader
+  const [isChatProcessing, setIsChatProcessing] = useState<boolean>(false); // State for GPT chat loader
+  const [showAllFiles, setShowAllFiles] = useState<boolean>(false); // State for Show More/Show Less
+  const [chatResponse, setChatResponse] = useState<string>("");
+  const [userQuestion, setUserQuestion] = useState<string>("");
+  const [chatHistory, setChatHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
 
   useEffect(() => {
     if (user) {
@@ -35,65 +40,60 @@ export default function Home() {
     }
   }, [user]);
 
-  // Load user files and set the first file selected
   const loadUserFiles = async () => {
     if (user) {
       const files = await fetchUserFiles(user.uid);
       setUploadedFiles(files);
       if (files.length > 0) {
-        setSelectedFileIndex(0); // Automatically select the first file
+        setSelectedFileIndex(0);
       }
     }
   };
 
-  // Set up real-time chat listener for the selected file
   useEffect(() => {
     if (selectedFileIndex !== null && user) {
-      setLoadingHistory(true); // Show loader while fetching chat history
+      setLoadingHistory(true);
       const selectedFile = uploadedFiles[selectedFileIndex];
       const unsubscribe = listenToChatHistory(
         user.uid,
         selectedFile.fileName,
         (chats) => {
-          setChatHistory(chats); // Update chat history with both user and bot messages
-          setLoadingHistory(false); // Hide loader once chat history is fetched
+          setChatHistory(chats);
+          setLoadingHistory(false);
         }
       );
 
-      return () => unsubscribe(); // Cleanup listener on component unmount or file change
+      return () => unsubscribe();
     }
   }, [selectedFileIndex, uploadedFiles]);
 
-  // Handle file upload and store extracted text
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      setIsProcessing(true);
+  const handleUpload = async (info: any) => {
+    const file = info.file;
+    if (file.status !== "uploading") {
+      setIsUploading(true);
       try {
         const extractedText = await extractTextFromFile(file);
-        await uploadFileMetadata(user.uid, file.name, extractedText); // Upload metadata
+        await uploadFileMetadata(user.uid, file.name, extractedText);
         setUploadedFiles((prevFiles) => [
           ...prevFiles,
           { fileName: file.name, extractedText },
         ]);
-        if (uploadedFiles.length === 0) setSelectedFileIndex(0); // Select first file if it's the only file
-        alert("File uploaded and extracted successfully!");
+        if (uploadedFiles.length === 0) setSelectedFileIndex(0);
+        message.success(`${file.name} uploaded successfully.`);
       } catch (error) {
         console.error("Error uploading file:", error);
-        alert("Error uploading file");
+        message.error(`${file.name} failed to upload.`);
       } finally {
-        setIsProcessing(false);
+        setIsUploading(false);
       }
     }
   };
 
-  // Handle chat submission and store both user and bot chat messages in Firestore
   const handleChatSubmit = async () => {
     if (userQuestion.trim() && selectedFileIndex !== null) {
       const selectedFile = uploadedFiles[selectedFileIndex];
-      setIsProcessing(true); // Show loader while sending the question
+      setIsChatProcessing(true);
       try {
-        // Store the user's question in Firestore
         await storeChatHistory(
           user.uid,
           selectedFile.fileName,
@@ -101,7 +101,6 @@ export default function Home() {
           "user"
         );
 
-        // Clear the input field after submission
         setUserQuestion("");
 
         const response = await fetch("/api/chat", {
@@ -113,11 +112,9 @@ export default function Home() {
           }),
         });
 
-        if (!response.body) {
-          throw new Error("Response body is not available.");
-        }
+        if (!response.body) throw new Error("Response body is not available.");
 
-        const reader = response.body.getReader(); // Start reading the stream
+        const reader = response.body.getReader();
         let text = "";
         const decoder = new TextDecoder();
 
@@ -125,14 +122,12 @@ export default function Home() {
           const { done, value } = await reader.read();
           if (done) break;
           text += decoder.decode(value, { stream: true });
-          setChatResponse(text); // Update chat response in real-time
+          setChatResponse(text);
         }
 
-        // Remove "response" key and display only the message
         const parsedResponse = JSON.parse(text);
         const botResponse = parsedResponse.response;
 
-        // Store the bot's response in Firestore
         await storeChatHistory(
           user.uid,
           selectedFile.fileName,
@@ -142,9 +137,13 @@ export default function Home() {
       } catch (error) {
         console.error("Error with chat:", error);
       } finally {
-        setIsProcessing(false); // Hide loader after processing
+        setIsChatProcessing(false);
       }
     }
+  };
+
+  const toggleShowFiles = () => {
+    setShowAllFiles(!showAllFiles);
   };
 
   return (
@@ -155,37 +154,55 @@ export default function Home() {
       <div className="container">
         <div className="sidebar">
           <h2>Uploaded Files</h2>
-          {isProcessing ? (
+          {isUploading ? (
             <Loader />
           ) : (
             <>
               <ul className="file-list">
-                {uploadedFiles.map((file, index) => (
-                  <li key={file.fileName}>
-                    <button
-                      className={`file-item ${
-                        index === selectedFileIndex ? "file-item-active" : ""
-                      }`}
-                      onClick={() => setSelectedFileIndex(index)}
-                    >
-                      {file.fileName}
-                    </button>
-                  </li>
-                ))}
+                {uploadedFiles
+                  .slice(0, showAllFiles ? uploadedFiles.length : 5)
+                  .map((file, index) => (
+                    <li key={file.fileName}>
+                      <button
+                        className={`file-item ${
+                          index === selectedFileIndex ? "file-item-active" : ""
+                        }`}
+                        onClick={() => setSelectedFileIndex(index)}
+                      >
+                        {file.fileName}
+                      </button>
+                    </li>
+                  ))}
               </ul>
-              <input
-                type="file"
-                onChange={handleFileChange}
-                className="file-input"
-              />
+              {uploadedFiles.length > 5 && (
+                <span onClick={toggleShowFiles} className="toggle-files-text">
+                  {showAllFiles ? "Show Less" : "Show More"}
+                </span>
+              )}
+
+              <Upload.Dragger
+                name="file"
+                multiple={false}
+                customRequest={handleUpload}
+                className="file-uploader"
+                showUploadList={false}
+              >
+                <p className="ant-upload-drag-icon">
+                  <UploadOutlined />
+                </p>
+                <p className="ant-upload-text">
+                  Click or drag file to this area to upload
+                </p>
+              </Upload.Dragger>
             </>
           )}
         </div>
+
         <div className="chatbot">
           <h2>Chatbot</h2>
           <div className="chatbox">
             {loadingHistory ? (
-              <Loader /> // Show loader while fetching chat history
+              <Loader />
             ) : (
               <div className="chatbox-messages">
                 {selectedFileIndex !== null ? (
@@ -223,12 +240,14 @@ export default function Home() {
                 placeholder="Ask a question..."
                 disabled={selectedFileIndex === null}
               />
-              <button
+              <Button
+                type="primary"
                 onClick={handleChatSubmit}
                 disabled={selectedFileIndex === null}
+                style={{ marginLeft: "10px" }}
               >
-                Ask GPT-4
-              </button>
+                {isChatProcessing ? <Spin /> : "Ask GPT-4"}
+              </Button>
             </div>
           </div>
         </div>
