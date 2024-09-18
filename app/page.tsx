@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Upload, Button, message, Spin } from "antd";
+import { Upload, Button, message, Spin, Card } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import AuthButton from "./components/AuthButton";
 import useAuth from "./hooks/useAuth";
@@ -12,11 +12,6 @@ import Papa from "papaparse";
 import Loader from "./components/Loader";
 import "antd/dist/reset.css";
 
-interface UploadedFile {
-  fileName: string;
-  extractedText: string;
-}
-
 export default function Home() {
   const { user } = useAuth();
   const {
@@ -25,17 +20,15 @@ export default function Home() {
     storeChatHistory,
     listenToChatHistory,
   } = useFirestore();
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(
-    null
-  );
-  const [isUploading, setIsUploading] = useState<boolean>(false);
-  const [isChatProcessing, setIsChatProcessing] = useState<boolean>(false);
-  const [showAllFiles, setShowAllFiles] = useState<boolean>(false);
-  const [userQuestion, setUserQuestion] = useState<string>("");
-  const [chatHistory, setChatHistory] = useState<any[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
-  const [queryAllFiles, setQueryAllFiles] = useState<boolean>(false); // Default is false
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [selectedFileIndex, setSelectedFileIndex] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isChatProcessing, setIsChatProcessing] = useState(false);
+  const [showAllFiles, setShowAllFiles] = useState(false);
+  const [userQuestion, setUserQuestion] = useState("");
+  const [chatHistory, setChatHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [queryAllFiles, setQueryAllFiles] = useState(false); // Default is false
 
   // Load the user's uploaded files when component mounts
   useEffect(() => {
@@ -71,7 +64,7 @@ export default function Home() {
     }
   }, [selectedFileIndex, uploadedFiles, queryAllFiles]);
 
-  const handleUpload = async (info: any) => {
+  const handleUpload = async (info) => {
     const file = info.file;
     const fileType = file.type;
 
@@ -137,7 +130,7 @@ export default function Home() {
   };
 
   // Ensure that pressing Enter triggers message submission
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyPress = (e) => {
     if (e.key === "Enter" && !isChatProcessing) {
       handleChatSubmit();
     }
@@ -227,7 +220,7 @@ export default function Home() {
           botResponse,
           "bot"
         );
-      } catch (error: any) {
+      } catch (error) {
         console.error("Error with chat submission:", error);
         setChatHistory((prev) => [
           ...prev,
@@ -249,116 +242,136 @@ export default function Home() {
       <div className="auth-container">
         <AuthButton />
       </div>
-      <div className="container">
-        <div className="sidebar">
-          <h2>Uploaded Files</h2>
-          {isUploading ? (
-            <Loader />
-          ) : (
-            <>
-              <ul className="file-list">
-                {uploadedFiles
-                  .slice(0, showAllFiles ? uploadedFiles.length : 5)
-                  .map((file, index) => (
-                    <li key={`${file.fileName}-${index}`}>
-                      <button
-                        className={`file-item ${
-                          index === selectedFileIndex && !queryAllFiles
-                            ? "file-item-active"
-                            : ""
-                        }`}
-                        onClick={() => {
-                          setSelectedFileIndex(index);
-                          setQueryAllFiles(false); // Query specific file
-                        }}
-                      >
-                        {file.fileName}
-                      </button>
-                    </li>
-                  ))}
-              </ul>
-              {uploadedFiles.length > 5 && (
-                <span onClick={() => setShowAllFiles(!showAllFiles)}>
-                  {showAllFiles ? "Show Less" : "Show More"}
-                </span>
-              )}
+      <div className="main-container">
+        <div className="sidebar-card">
+          <Card className="sidebar-inner-card">
+            <div className="sidebar">
+              <h2>Uploaded Files</h2>
 
-              <Upload.Dragger
-                name="file"
-                multiple={false}
-                customRequest={handleUpload}
-                className="file-uploader"
-                showUploadList={false}
-              >
-                <p className="ant-upload-drag-icon">
-                  <UploadOutlined />
-                </p>
-                <p className="ant-upload-text">
-                  Click or drag file to this area to upload
-                </p>
-              </Upload.Dragger>
+              {/* Sidebar content */}
+              <>
+                <ul className="file-list">
+                  {uploadedFiles
+                    .slice(0, showAllFiles ? uploadedFiles.length : 5)
+                    .map((file, index) => (
+                      <li key={`${file.fileName}-${index}`}>
+                        <button
+                          className={`file-item ${
+                            index === selectedFileIndex && !queryAllFiles
+                              ? "file-item-active"
+                              : ""
+                          }`}
+                          onClick={() => {
+                            setSelectedFileIndex(index);
+                            setQueryAllFiles(false); // Query specific file
+                          }}
+                        >
+                          {file.fileName}
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+                {uploadedFiles.length > 5 && (
+                  <button
+                    className="toggle-files-btn"
+                    onClick={() => setShowAllFiles(!showAllFiles)}
+                  >
+                    {showAllFiles ? "Show Less" : "Show More"}
+                  </button>
+                )}
 
-              {uploadedFiles.length > 1 && (
-                <button
-                  className={`file-item ${
-                    queryAllFiles ? "file-item-active" : ""
-                  }`}
-                  onClick={() => {
-                    setQueryAllFiles(true); // Enable query across all files
-                    setSelectedFileIndex(null); // Unselect any specific file
-                  }}
-                  style={{ marginTop: "20px" }}
+                {uploadedFiles.length > 1 && (
+                  <button
+                    className={`file-item ${
+                      queryAllFiles ? "file-item-active" : ""
+                    }`}
+                    onClick={() => {
+                      setQueryAllFiles(true); // Enable query across all files
+                      setSelectedFileIndex(null); // Unselect any specific file
+                    }}
+                    style={{ marginTop: "20px" }}
+                  >
+                    Query Across All Files
+                  </button>
+                )}
+
+                <Upload.Dragger
+                  name="file"
+                  multiple={false}
+                  customRequest={handleUpload}
+                  className="file-uploader"
+                  showUploadList={false}
+                  style={{ marginTop: "20px" }} // Ensure it's at the bottom
                 >
-                  Query Across All Files
-                </button>
+                  <p className="ant-upload-drag-icon">
+                    <UploadOutlined />
+                  </p>
+                  <p className="ant-upload-text">
+                    Click or drag file to this area to upload
+                  </p>
+                </Upload.Dragger>
+              </>
+
+              {isUploading && (
+                <div className="uploading-overlay">
+                  <Loader />
+                </div>
               )}
-            </>
-          )}
+            </div>
+          </Card>
         </div>
 
-        <div className="chatbot">
-          <h2>Chatbot</h2>
-          <div className="chatbox">
-            <div className="chatbox-messages">
-              {loadingHistory ? (
-                <Loader />
-              ) : chatHistory.length > 0 ? (
-                chatHistory.map((chat, index) => (
-                  <div
-                    key={index}
-                    className={`chat-message ${
-                      chat.sender === "user" ? "user-message" : "bot-message"
-                    }`}
+        <div className="chatbot-card">
+          <Card className="chatbot-inner-card">
+            <div className="chatbot">
+              <h2>Chatbot</h2>
+              <div className="chatbox">
+                <div className="chatbox-messages">
+                  {loadingHistory ? (
+                    <Loader />
+                  ) : chatHistory.length > 0 ? (
+                    chatHistory.map((chat, index) => (
+                      <div
+                        key={index}
+                        className={`chat-message ${
+                          chat.sender === "user"
+                            ? "user-message"
+                            : "bot-message"
+                        }`}
+                      >
+                        <p>
+                          <strong>
+                            {chat.sender === "user" ? "You" : "Bot"}:
+                          </strong>{" "}
+                          {chat.message}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p>No chat history available.</p>
+                  )}
+                </div>
+                <div className="chatbox-input">
+                  <input
+                    type="text"
+                    value={userQuestion}
+                    onChange={(e) => setUserQuestion(e.target.value)}
+                    placeholder="Ask a question..."
+                    disabled={isChatProcessing}
+                    onKeyPress={handleKeyPress} // Trigger on Enter key
+                  />
+                  <Button
+                    type="primary"
+                    onClick={handleChatSubmit}
+                    disabled={isChatProcessing}
+                    style={{ marginLeft: "10px" }}
                   >
-                    <p>
-                      <strong>{chat.sender === "user" ? "You" : "Bot"}:</strong>{" "}
-                      {chat.message}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <p>No chat history available.</p>
-              )}
+                    {isChatProcessing ? <Spin /> : "Ask GPT-4"}
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div className="chatbox-input">
-              <input
-                type="text"
-                value={userQuestion}
-                onChange={(e) => setUserQuestion(e.target.value)}
-                placeholder="Ask a question..."
-                disabled={isChatProcessing}
-                onKeyPress={handleKeyPress} // Trigger on Enter key
-              />
-              <Button
-                type="primary"
-                onClick={handleChatSubmit}
-                disabled={isChatProcessing}
-                style={{ marginLeft: "10px" }}
-              >
-                {isChatProcessing ? <Spin /> : "Ask GPT-4"}
-              </Button>
-            </div>
-          </div>
+          </Card>
         </div>
       </div>
     </div>
