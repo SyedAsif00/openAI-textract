@@ -6,6 +6,9 @@ import AuthButton from "./components/AuthButton";
 import useAuth from "./hooks/useAuth";
 import { useFirestore } from "./hooks/useFirestore";
 import { extractTextFromFile } from "./services/aws/textract";
+import mammoth from "mammoth";
+import * as XLSX from "xlsx";
+import Papa from "papaparse";
 import Loader from "./components/Loader";
 import "antd/dist/reset.css";
 
@@ -26,9 +29,9 @@ export default function Home() {
   const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(
     null
   );
-  const [isUploading, setIsUploading] = useState<boolean>(false); // State for file upload loader
-  const [isChatProcessing, setIsChatProcessing] = useState<boolean>(false); // State for GPT chat loader
-  const [showAllFiles, setShowAllFiles] = useState<boolean>(false); // State for Show More/Show Less
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [isChatProcessing, setIsChatProcessing] = useState<boolean>(false);
+  const [showAllFiles, setShowAllFiles] = useState<boolean>(false);
   const [chatResponse, setChatResponse] = useState<string>("");
   const [userQuestion, setUserQuestion] = useState<string>("");
   const [chatHistory, setChatHistory] = useState<any[]>([]);
@@ -69,11 +72,51 @@ export default function Home() {
 
   const handleUpload = async (info: any) => {
     const file = info.file;
+    const fileType = file.type;
+
     if (file.status !== "uploading") {
       setIsUploading(true);
+
+      let extractedText = "";
       try {
-        const extractedText = await extractTextFromFile(file);
+        if (
+          fileType ===
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ) {
+          // Handle DOCX
+          const arrayBuffer = await file.arrayBuffer();
+          const result = await mammoth.extractRawText({ arrayBuffer });
+          extractedText = result.value;
+
+          // Log the extracted text to debug
+          console.log("Extracted text from DOCX:", extractedText);
+        } else if (
+          fileType ===
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ) {
+          // Handle XLSX
+          const data = new Uint8Array(await file.arrayBuffer());
+          const workbook = XLSX.read(data, { type: "array" });
+          extractedText = workbook.SheetNames.map((sheetName) => {
+            const worksheet = workbook.Sheets[sheetName];
+            return XLSX.utils.sheet_to_csv(worksheet);
+          }).join("\n");
+        } else if (fileType === "text/csv") {
+          // Handle CSV
+          extractedText = await new Promise((resolve, reject) => {
+            Papa.parse(file, {
+              complete: (result) => resolve(result.data.join("\n")),
+              error: (error) => reject(error),
+            });
+          });
+        } else {
+          // Handle PDFs & Images with AWS Textract
+          extractedText = await extractTextFromFile(file);
+        }
+
+        // Upload extracted text to Firebase
         await uploadFileMetadata(user.uid, file.name, extractedText);
+
         setUploadedFiles((prevFiles) => [
           ...prevFiles,
           { fileName: file.name, extractedText },
@@ -162,7 +205,7 @@ export default function Home() {
                 {uploadedFiles
                   .slice(0, showAllFiles ? uploadedFiles.length : 5)
                   .map((file, index) => (
-                    <li key={file.fileName}>
+                    <li key={`${file.fileName}-${index}`}>
                       <button
                         className={`file-item ${
                           index === selectedFileIndex ? "file-item-active" : ""
