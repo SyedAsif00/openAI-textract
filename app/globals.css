@@ -13,11 +13,10 @@ body {
 
 /* Sign-out Button Container */
 .auth-container {
-  position: absolute;
+  position: fixed;
   top: 20px;
   right: 30px;
   display: flex;
-  justify-content: center;
   align-items: center;
 }
 
@@ -45,18 +44,18 @@ body {
 /* Main Container */
 .container {
   display: flex;
-  justify-content: space-between;
-  width: 100vw; /* Full width */
+  width: 100vw;
   height: 85vh;
   background-color: white;
   border-radius: 12px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
   padding: 20px;
-  margin-top: 60px; /* Push container down to avoid overlap with header */
+  margin-top: 60px;
 }
 
 /* Sidebar */
 .sidebar {
+  position: relative; /* Added for overlay positioning */
   width: 300px;
   background-color: #f7f7f7;
   padding: 20px;
@@ -77,10 +76,12 @@ body {
   margin: 0;
   overflow-y: auto;
   flex-grow: 1;
-  max-height: 250px; /* Limit the height for scrollbar */
+  max-height: 250px;
 }
 
 .file-item {
+  display: block; /* Ensures the button spans the full width */
+  width: 100%; /* Ensures the button spans the full width */
   background-color: #e0f7fa;
   color: #00796b;
   padding: 12px;
@@ -102,7 +103,7 @@ body {
 }
 
 .file-list::-webkit-scrollbar {
-  width: 6px; /* Narrow scrollbar */
+  width: 6px;
 }
 
 .file-list::-webkit-scrollbar-thumb {
@@ -110,14 +111,9 @@ body {
   border-radius: 10px;
 }
 
-.file-input {
+/* Upload Dragger */
+.file-uploader {
   margin-top: 20px;
-  width: 100%;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #ced4da;
-  background-color: #fff;
-  cursor: pointer;
 }
 
 /* Button for Show More/Show Less */
@@ -142,16 +138,20 @@ body {
   display: flex;
   flex-direction: column;
   padding: 20px;
-  width: calc(100% - 320px); /* Take the remaining width after sidebar */
+  width: calc(100% - 320px);
 }
 
-.chatbox-header {
+.chatbot h2 {
   font-size: 1.8em;
   font-weight: bold;
   color: #333;
   margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid #f0f0f0;
+}
+
+.chatbox {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .chatbox-messages {
@@ -162,7 +162,6 @@ body {
   border-radius: 8px;
   overflow-y: auto;
   margin-bottom: 10px;
-  height: 60vh; /* Fixed height for chat messages */
 }
 
 .chat-message {
@@ -227,30 +226,18 @@ body {
   background-color: #0056b3;
 }
 
-/* Loader */
-.loader {
+/* Loader Overlay */
+.uploading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 300px; /* Same as sidebar width */
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.8);
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100px;
-  font-size: 1.2em;
-  color: #333;
-}
-
-/* Fix the sidebar and prevent changes during chat */
-.fixed-sidebar {
-  position: fixed;
-  top: 60px; /* Adjust according to your header height */
-  left: 0;
-  height: calc(100% - 60px); /* Full height excluding the header */
-  width: 300px;
-  overflow-y: auto;
-}
-
-/* Prevent sidebar from showing "uploading" during chat */
-.file-list,
-.file-item {
-  cursor: pointer;
+  z-index: 10;
 }
 
 /* Responsive */
@@ -275,5 +262,9 @@ body {
 
   .file-input {
     width: 100%;
+  }
+
+  .uploading-overlay {
+    width: 100%; /* Adjust overlay width for mobile */
   }
 }
