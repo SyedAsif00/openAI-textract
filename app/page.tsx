@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Upload, Button, message, Spin } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import AuthButton from "./components/AuthButton";
@@ -32,11 +32,12 @@ export default function Home() {
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [isChatProcessing, setIsChatProcessing] = useState<boolean>(false);
   const [showAllFiles, setShowAllFiles] = useState<boolean>(false);
-  const [chatResponse, setChatResponse] = useState<string>("");
   const [userQuestion, setUserQuestion] = useState<string>("");
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
+  const [queryAllFiles, setQueryAllFiles] = useState<boolean>(false); // Default is false
 
+  // Load the user's uploaded files when component mounts
   useEffect(() => {
     if (user) {
       loadUserFiles();
@@ -47,28 +48,28 @@ export default function Home() {
     if (user) {
       const files = await fetchUserFiles(user.uid);
       setUploadedFiles(files);
-      if (files.length > 0) {
-        setSelectedFileIndex(0);
+      if (files.length > 0 && selectedFileIndex === null && !queryAllFiles) {
+        setSelectedFileIndex(0); // Default to first file
       }
     }
   };
 
+  // Load chat history when a specific file is selected or when querying all files
   useEffect(() => {
-    if (selectedFileIndex !== null && user) {
+    if (user && (selectedFileIndex !== null || queryAllFiles)) {
       setLoadingHistory(true);
-      const selectedFile = uploadedFiles[selectedFileIndex];
-      const unsubscribe = listenToChatHistory(
-        user.uid,
-        selectedFile.fileName,
-        (chats) => {
-          setChatHistory(chats);
-          setLoadingHistory(false);
-        }
-      );
-
+      const fileName = queryAllFiles
+        ? "all-files"
+        : uploadedFiles[selectedFileIndex]?.fileName;
+      const unsubscribe = listenToChatHistory(user.uid, fileName, (chats) => {
+        setChatHistory(chats);
+        setLoadingHistory(false);
+      });
       return () => unsubscribe();
+    } else {
+      setChatHistory([]); // Clear chat history when no file is selected
     }
-  }, [selectedFileIndex, uploadedFiles]);
+  }, [selectedFileIndex, uploadedFiles, queryAllFiles]);
 
   const handleUpload = async (info: any) => {
     const file = info.file;
@@ -87,9 +88,6 @@ export default function Home() {
           const arrayBuffer = await file.arrayBuffer();
           const result = await mammoth.extractRawText({ arrayBuffer });
           extractedText = result.value;
-
-          // Log the extracted text to debug
-          console.log("Extracted text from DOCX:", extractedText);
         } else if (
           fileType ===
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -114,14 +112,20 @@ export default function Home() {
           extractedText = await extractTextFromFile(file);
         }
 
-        // Upload extracted text to Firebase
+        // Upload extracted text to Firestore
         await uploadFileMetadata(user.uid, file.name, extractedText);
 
         setUploadedFiles((prevFiles) => [
           ...prevFiles,
           { fileName: file.name, extractedText },
         ]);
-        if (uploadedFiles.length === 0) setSelectedFileIndex(0);
+        if (
+          uploadedFiles.length === 0 &&
+          selectedFileIndex === null &&
+          !queryAllFiles
+        ) {
+          setSelectedFileIndex(0);
+        }
         message.success(`${file.name} uploaded successfully.`);
       } catch (error) {
         console.error("Error uploading file:", error);
@@ -132,25 +136,61 @@ export default function Home() {
     }
   };
 
+  // Ensure that pressing Enter triggers message submission
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !isChatProcessing) {
+      handleChatSubmit();
+    }
+  };
+
+  // Submitting a chat message
   const handleChatSubmit = async () => {
-    if (userQuestion.trim() && selectedFileIndex !== null) {
-      const selectedFile = uploadedFiles[selectedFileIndex];
+    if (!uploadedFiles.length) {
+      message.error("Please upload at least one file to start chatting.");
+      return;
+    }
+    if (userQuestion.trim()) {
       setIsChatProcessing(true);
+      let extractedText = "";
+
       try {
+        // If querying across all files
+        if (queryAllFiles) {
+          extractedText = uploadedFiles
+            .map((file) => file.extractedText)
+            .join("\n");
+        } else if (selectedFileIndex !== null) {
+          const selectedFile = uploadedFiles[selectedFileIndex];
+          extractedText = selectedFile.extractedText;
+        } else {
+          // No file selected and not querying all files
+          throw new Error("No file selected.");
+        }
+
+        // Append user question to chat history immediately
+        const userChat = {
+          message: userQuestion,
+          sender: "user",
+          timestamp: new Date(),
+        };
+        setChatHistory((prev) => [...prev, userChat]);
+
+        // Store user's message in Firestore
         await storeChatHistory(
           user.uid,
-          selectedFile.fileName,
+          queryAllFiles
+            ? "all-files"
+            : uploadedFiles[selectedFileIndex].fileName,
           userQuestion,
           "user"
         );
 
-        setUserQuestion("");
-
+        // Send the question to OpenAI
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            extractedText: selectedFile.extractedText,
+            extractedText,
             userQuestion,
           }),
         });
@@ -165,28 +205,43 @@ export default function Home() {
           const { done, value } = await reader.read();
           if (done) break;
           text += decoder.decode(value, { stream: true });
-          setChatResponse(text);
         }
 
         const parsedResponse = JSON.parse(text);
         const botResponse = parsedResponse.response;
 
+        // Append bot's response to chat history
+        const botChat = {
+          message: botResponse,
+          sender: "bot",
+          timestamp: new Date(),
+        };
+        setChatHistory((prev) => [...prev, botChat]);
+
+        // Store bot's response in Firestore
         await storeChatHistory(
           user.uid,
-          selectedFile.fileName,
+          queryAllFiles
+            ? "all-files"
+            : uploadedFiles[selectedFileIndex].fileName,
           botResponse,
           "bot"
         );
-      } catch (error) {
-        console.error("Error with chat:", error);
+      } catch (error: any) {
+        console.error("Error with chat submission:", error);
+        setChatHistory((prev) => [
+          ...prev,
+          {
+            message: "Error: " + error.message,
+            sender: "bot",
+            timestamp: new Date(),
+          },
+        ]);
       } finally {
         setIsChatProcessing(false);
+        setUserQuestion(""); // Clear input after sending
       }
     }
-  };
-
-  const toggleShowFiles = () => {
-    setShowAllFiles(!showAllFiles);
   };
 
   return (
@@ -208,9 +263,14 @@ export default function Home() {
                     <li key={`${file.fileName}-${index}`}>
                       <button
                         className={`file-item ${
-                          index === selectedFileIndex ? "file-item-active" : ""
+                          index === selectedFileIndex && !queryAllFiles
+                            ? "file-item-active"
+                            : ""
                         }`}
-                        onClick={() => setSelectedFileIndex(index)}
+                        onClick={() => {
+                          setSelectedFileIndex(index);
+                          setQueryAllFiles(false); // Query specific file
+                        }}
                       >
                         {file.fileName}
                       </button>
@@ -218,7 +278,7 @@ export default function Home() {
                   ))}
               </ul>
               {uploadedFiles.length > 5 && (
-                <span onClick={toggleShowFiles} className="toggle-files-text">
+                <span onClick={() => setShowAllFiles(!showAllFiles)}>
                   {showAllFiles ? "Show Less" : "Show More"}
                 </span>
               )}
@@ -237,6 +297,21 @@ export default function Home() {
                   Click or drag file to this area to upload
                 </p>
               </Upload.Dragger>
+
+              {uploadedFiles.length > 1 && (
+                <button
+                  className={`file-item ${
+                    queryAllFiles ? "file-item-active" : ""
+                  }`}
+                  onClick={() => {
+                    setQueryAllFiles(true); // Enable query across all files
+                    setSelectedFileIndex(null); // Unselect any specific file
+                  }}
+                  style={{ marginTop: "20px" }}
+                >
+                  Query Across All Files
+                </button>
+              )}
             </>
           )}
         </div>
@@ -244,49 +319,40 @@ export default function Home() {
         <div className="chatbot">
           <h2>Chatbot</h2>
           <div className="chatbox">
-            {loadingHistory ? (
-              <Loader />
-            ) : (
-              <div className="chatbox-messages">
-                {selectedFileIndex !== null ? (
-                  <>
-                    {chatHistory.map((chat, index) => (
-                      <div
-                        key={index}
-                        className={`chat-message ${
-                          chat.sender === "user"
-                            ? "user-message"
-                            : "bot-message"
-                        }`}
-                      >
-                        <p>
-                          <strong>
-                            {chat.sender === "user" ? "You" : "Bot"}:
-                          </strong>{" "}
-                          {chat.message}
-                        </p>
-                      </div>
-                    ))}
-                  </>
-                ) : (
-                  <div className="empty-chatbox">
-                    Please upload a document to start chatting.
+            <div className="chatbox-messages">
+              {loadingHistory ? (
+                <Loader />
+              ) : chatHistory.length > 0 ? (
+                chatHistory.map((chat, index) => (
+                  <div
+                    key={index}
+                    className={`chat-message ${
+                      chat.sender === "user" ? "user-message" : "bot-message"
+                    }`}
+                  >
+                    <p>
+                      <strong>{chat.sender === "user" ? "You" : "Bot"}:</strong>{" "}
+                      {chat.message}
+                    </p>
                   </div>
-                )}
-              </div>
-            )}
+                ))
+              ) : (
+                <p>No chat history available.</p>
+              )}
+            </div>
             <div className="chatbox-input">
               <input
                 type="text"
                 value={userQuestion}
                 onChange={(e) => setUserQuestion(e.target.value)}
                 placeholder="Ask a question..."
-                disabled={selectedFileIndex === null}
+                disabled={isChatProcessing}
+                onKeyPress={handleKeyPress} // Trigger on Enter key
               />
               <Button
                 type="primary"
                 onClick={handleChatSubmit}
-                disabled={selectedFileIndex === null}
+                disabled={isChatProcessing}
                 style={{ marginLeft: "10px" }}
               >
                 {isChatProcessing ? <Spin /> : "Ask GPT-4"}

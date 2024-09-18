@@ -31,8 +31,8 @@ export const useFirestore = () => {
       const q = query(collection(db, `users/${userId}/files`));
       const querySnapshot = await getDocs(q);
       let files = [];
-      querySnapshot.forEach((doc) => {
-        files.push({ ...doc.data(), id: doc.id });
+      querySnapshot.forEach((docSnapshot) => {
+        files.push({ ...docSnapshot.data(), id: docSnapshot.id });
       });
       return files;
     } catch (error) {
@@ -41,7 +41,7 @@ export const useFirestore = () => {
     }
   };
 
-  // Real-time chat listener for a specific file
+  // Real-time chat listener for a specific file or all files
   const listenToChatHistory = (userId, fileName, callback) => {
     const q = query(
       collection(db, `users/${userId}/chats`),
@@ -51,8 +51,8 @@ export const useFirestore = () => {
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       let chats = [];
-      querySnapshot.forEach((doc) => {
-        chats.push({ ...doc.data(), id: doc.id });
+      querySnapshot.forEach((docSnapshot) => {
+        chats.push({ ...docSnapshot.data(), id: docSnapshot.id });
       });
       callback(chats); // Pass the chats to the callback function
     });
@@ -63,11 +63,8 @@ export const useFirestore = () => {
   // Function to store chat history for a user
   const storeChatHistory = async (userId, fileName, message, sender) => {
     try {
-      const chatDoc = doc(
-        db,
-        `users/${userId}/chats`,
-        `${fileName}_${new Date().getTime()}`
-      );
+      const chatCollection = collection(db, `users/${userId}/chats`);
+      const chatDoc = doc(chatCollection); // Auto-generated ID
       await setDoc(chatDoc, {
         fileName,
         message,
