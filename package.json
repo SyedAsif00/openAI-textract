@@ -9,10 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ant-design/icons": "^5.4.0",
     "@aws-sdk/client-textract": "^3.650.0",
     "antd": "^5.20.6",
     "aws-sdk": "^2.1691.0",
     "axios": "^1.7.7",
+    "eventsource-parser": "^2.0.1",
     "firebase": "^10.13.1",
     "mammoth": "^1.8.0",
     "next": "14.2.11",
@@ -24,6 +26,7 @@
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/papaparse": "^5.3.14",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^8",

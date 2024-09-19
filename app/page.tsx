@@ -1,7 +1,7 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import { Upload, Button, message, Spin, Card } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
+import React, { useState, useEffect, useRef } from "react";
+import { Upload, Button, message, Spin, Card, Input } from "antd";
+import { UploadOutlined, LoadingOutlined } from "@ant-design/icons";
 import AuthButton from "./components/AuthButton";
 import useAuth from "./hooks/useAuth";
 import { useFirestore } from "./hooks/useFirestore";
@@ -9,7 +9,6 @@ import { extractTextFromFile } from "./services/aws/textract";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
-import Loader from "./components/Loader";
 import "antd/dist/reset.css";
 
 export default function Home() {
@@ -23,12 +22,26 @@ export default function Home() {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [selectedFileIndex, setSelectedFileIndex] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [isChatProcessing, setIsChatProcessing] = useState(false);
   const [showAllFiles, setShowAllFiles] = useState(false);
   const [userQuestion, setUserQuestion] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [queryAllFiles, setQueryAllFiles] = useState(false); // Default is false
+  const [queryAllFiles, setQueryAllFiles] = useState(false);
+
+  // New state for the bot's streaming response
+  const [botStreamingResponse, setBotStreamingResponse] = useState("");
+
+  // Reference to chat messages div
+  const messagesEndRef = useRef(null);
+
+  // Scroll to bottom when new message is added
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatHistory, botStreamingResponse]);
 
   // Load the user's uploaded files when component mounts
   useEffect(() => {
@@ -70,16 +83,22 @@ export default function Home() {
 
     if (file.status !== "uploading") {
       setIsUploading(true);
+      setUploadProgress(0);
 
       let extractedText = "";
       try {
+        // Simulate progress updates
+        setUploadProgress(10);
+
         if (
           fileType ===
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         ) {
           // Handle DOCX
           const arrayBuffer = await file.arrayBuffer();
+          setUploadProgress(30);
           const result = await mammoth.extractRawText({ arrayBuffer });
+          setUploadProgress(60);
           extractedText = result.value;
         } else if (
           fileType ===
@@ -87,26 +106,36 @@ export default function Home() {
         ) {
           // Handle XLSX
           const data = new Uint8Array(await file.arrayBuffer());
+          setUploadProgress(30);
           const workbook = XLSX.read(data, { type: "array" });
+          setUploadProgress(60);
           extractedText = workbook.SheetNames.map((sheetName) => {
             const worksheet = workbook.Sheets[sheetName];
             return XLSX.utils.sheet_to_csv(worksheet);
           }).join("\n");
         } else if (fileType === "text/csv") {
           // Handle CSV
+          setUploadProgress(30);
           extractedText = await new Promise((resolve, reject) => {
             Papa.parse(file, {
-              complete: (result) => resolve(result.data.join("\n")),
+              complete: (result) => {
+                setUploadProgress(60);
+                resolve(result.data.join("\n"));
+              },
               error: (error) => reject(error),
             });
           });
         } else {
           // Handle PDFs & Images with AWS Textract
+          setUploadProgress(30);
           extractedText = await extractTextFromFile(file);
+          setUploadProgress(60);
         }
 
         // Upload extracted text to Firestore
+        setUploadProgress(80);
         await uploadFileMetadata(user.uid, file.name, extractedText);
+        setUploadProgress(100);
 
         setUploadedFiles((prevFiles) => [
           ...prevFiles,
@@ -125,6 +154,7 @@ export default function Home() {
         message.error(`${file.name} failed to upload.`);
       } finally {
         setIsUploading(false);
+        setUploadProgress(0);
       }
     }
   };
@@ -178,6 +208,9 @@ export default function Home() {
           "user"
         );
 
+        // Initialize streaming response
+        setBotStreamingResponse("");
+
         // Send the question to OpenAI
         const response = await fetch("/api/chat", {
           method: "POST",
@@ -191,17 +224,19 @@ export default function Home() {
         if (!response.body) throw new Error("Response body is not available.");
 
         const reader = response.body.getReader();
-        let text = "";
         const decoder = new TextDecoder();
+        let done = false;
+        let botResponse = "";
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          text += decoder.decode(value, { stream: true });
+        while (!done) {
+          const { value, done: doneReading } = await reader.read();
+          done = doneReading;
+          const chunkValue = decoder.decode(value);
+          if (chunkValue) {
+            botResponse += chunkValue;
+            setBotStreamingResponse(botResponse);
+          }
         }
-
-        const parsedResponse = JSON.parse(text);
-        const botResponse = parsedResponse.response;
 
         // Append bot's response to chat history
         const botChat = {
@@ -233,6 +268,7 @@ export default function Home() {
       } finally {
         setIsChatProcessing(false);
         setUserQuestion(""); // Clear input after sending
+        setBotStreamingResponse("");
       }
     }
   };
@@ -271,6 +307,7 @@ export default function Home() {
                       </li>
                     ))}
                 </ul>
+
                 {uploadedFiles.length > 5 && (
                   <button
                     className="toggle-files-btn"
@@ -282,7 +319,7 @@ export default function Home() {
 
                 {uploadedFiles.length > 1 && (
                   <button
-                    className={`file-item ${
+                    className={`file-item query-all-button ${
                       queryAllFiles ? "file-item-active" : ""
                     }`}
                     onClick={() => {
@@ -301,7 +338,8 @@ export default function Home() {
                   customRequest={handleUpload}
                   className="file-uploader"
                   showUploadList={false}
-                  style={{ marginTop: "20px" }} // Ensure it's at the bottom
+                  style={{ marginTop: "20px" }}
+                  disabled={isUploading}
                 >
                   <p className="ant-upload-drag-icon">
                     <UploadOutlined />
@@ -314,7 +352,17 @@ export default function Home() {
 
               {isUploading && (
                 <div className="uploading-overlay">
-                  <Loader />
+                  <div className="upload-progress">
+                    <div className="progress-bar-container">
+                      <div
+                        className="progress-bar"
+                        style={{ width: `${uploadProgress}%` }}
+                      >
+                        {uploadProgress}%
+                      </div>
+                    </div>
+                    <p>Uploading...</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -328,45 +376,55 @@ export default function Home() {
               <div className="chatbox">
                 <div className="chatbox-messages">
                   {loadingHistory ? (
-                    <Loader />
-                  ) : chatHistory.length > 0 ? (
-                    chatHistory.map((chat, index) => (
-                      <div
-                        key={index}
-                        className={`chat-message ${
-                          chat.sender === "user"
-                            ? "user-message"
-                            : "bot-message"
-                        }`}
-                      >
-                        <p>
-                          <strong>
-                            {chat.sender === "user" ? "You" : "Bot"}:
-                          </strong>{" "}
-                          {chat.message}
-                        </p>
-                      </div>
-                    ))
+                    <div className="chat-loader">
+                      <Spin size="large" />
+                    </div>
                   ) : (
-                    <p>No chat history available.</p>
+                    <>
+                      {chatHistory.map((chat, index) => (
+                        <div
+                          key={index}
+                          className={`chat-message ${
+                            chat.sender === "user"
+                              ? "user-message"
+                              : "bot-message"
+                          }`}
+                        >
+                          <p>{chat.message}</p>
+                        </div>
+                      ))}
+                      {/* Display streaming response if it's being generated */}
+                      {isChatProcessing && botStreamingResponse && (
+                        <div className="chat-message bot-message">
+                          <p>{botStreamingResponse}</p>
+                        </div>
+                      )}
+                    </>
                   )}
+                  {/* Dummy div to keep scroll at bottom */}
+                  <div ref={messagesEndRef} />
                 </div>
                 <div className="chatbox-input">
-                  <input
+                  <Input
                     type="text"
                     value={userQuestion}
                     onChange={(e) => setUserQuestion(e.target.value)}
                     placeholder="Ask a question..."
                     disabled={isChatProcessing}
                     onKeyPress={handleKeyPress} // Trigger on Enter key
+                    className="chat-input"
                   />
                   <Button
                     type="primary"
                     onClick={handleChatSubmit}
                     disabled={isChatProcessing}
-                    style={{ marginLeft: "10px" }}
+                    className="chat-submit-button"
                   >
-                    {isChatProcessing ? <Spin /> : "Ask GPT-4"}
+                    {isChatProcessing ? (
+                      <Spin indicator={<LoadingOutlined />} />
+                    ) : (
+                      "Send"
+                    )}
                   </Button>
                 </div>
               </div>
