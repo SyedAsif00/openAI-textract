@@ -1,3 +1,4 @@
+/* Global Styles */
 * {
   margin: 0;
   padding: 0;
@@ -13,8 +14,7 @@ body {
 
 body {
   background-color: #f0f0f0;
-
-  padding: 10px; /* Global padding */
+  padding: 0;
 }
 
 /* Auth Container */
@@ -28,20 +28,20 @@ body {
 }
 
 .user-avatar {
-  width: 30px; /* Reduced size */
+  width: 30px;
   height: 30px;
   border-radius: 50%;
   margin-right: 8px;
 }
 
 .auth-button {
-  padding: 5px 10px; /* Smaller size */
+  padding: 5px 10px;
   background-color: #007bff;
   color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;
-  font-size: 12px; /* Smaller text */
+  font-size: 12px;
 }
 
 .auth-button:hover {
@@ -52,45 +52,29 @@ body {
 .main-container {
   display: flex;
   width: 100%;
-  height: calc(100% - 80px);
-  margin-top: 80px;
+  height: 100vh;
 }
 
 /* Sidebar */
 .sidebar-card {
-  width: 300px;
-  flex-shrink: 0;
+  width: 25%;
   display: flex;
   flex-direction: column;
-  padding-right: 10px;
-  height: 100%; /* Ensure full height */
+  height: 100%;
 }
 
-.chatbot-card {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  height: 100%; /* Ensure full height */
-}
-
-/* Sidebar Inner Card */
-.sidebar-inner-card,
-.chatbot-inner-card {
+.sidebar-inner-card {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
-/* Sidebar Styles */
 .sidebar {
-  position: relative;
-  flex: 1;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
-/* Sidebar Header */
 .sidebar h2 {
   font-size: 1.5em;
   color: #333;
@@ -98,7 +82,6 @@ body {
   flex-shrink: 0;
 }
 
-/* File List */
 .file-list {
   list-style: none;
   padding: 0;
@@ -117,8 +100,8 @@ body {
   border-radius: 8px;
   cursor: pointer;
   text-align: left;
-  border: none;
   transition: background-color 0.3s ease;
+  border: none;
 }
 
 .file-item-active {
@@ -128,19 +111,6 @@ body {
 
 .file-item:hover {
   background-color: #b2ebf2;
-}
-
-/* Toggle Files Button */
-.toggle-files-btn {
-  background: none;
-  border: none;
-  color: #007bff;
-  cursor: pointer;
-  font-size: 12px; /* Small text */
-  padding: 0;
-  align-self: flex-end; /* Position to the right */
-  margin-top: 5px;
-  margin-bottom: 10px;
 }
 
 /* Query All Files Button */
@@ -158,107 +128,23 @@ body {
   background-color: #ffcc80;
 }
 
-/* Chatbot Styles */
-.chatbot {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.chatbot h2 {
-  font-size: 1.5em;
-  color: #333;
-  margin-bottom: 20px;
-  flex-shrink: 0;
-}
-
-/* Chatbox */
-.chatbox {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  height: 100%;
-}
-
-.chatbox-messages {
-  flex: 1;
-  padding: 15px;
-  background-color: #f9f9f9;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  overflow-y: auto;
-  min-height: 500px;
-}
-
-.chat-message {
-  margin-bottom: 10px;
-  display: flex;
-}
-
-.user-message p {
-  margin-left: auto;
-  text-align: right;
-  background-color: #d1e7dd;
-  padding: 12px;
-  border-radius: 8px;
-  color: #155724;
-  max-width: 70%;
-}
-
-.bot-message p {
-  text-align: left;
-  background-color: #f8d7da;
-  padding: 12px;
-  border-radius: 8px;
-  color: #721c24;
-  max-width: 70%;
-}
-
-.empty-chatbox {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.empty-chatbox p {
-  font-size: 1.2em;
-  color: #777;
-}
-
-/* Chatbox Input */
-.chatbox-input {
-  display: flex;
-  align-items: center;
-  padding-top: 10px;
-}
-
-.chat-input {
-  flex: 1;
-  padding: 12px;
-  border-radius: 8px 0 0 8px;
-  border: 1px solid #ced4da;
-  font-size: 16px;
-  outline: none;
-}
-
-.chat-input:focus {
-  border-color: #007bff;
-}
-
-.chat-submit-button {
-  padding: 12px 20px;
-  border-radius: 0 8px 8px 0;
-  border: 1px solid #007bff;
-  background-color: #007bff;
-  color: white;
+/* Show More/Less styling */
+.toggle-files-btn {
+  background: none;
+  border: none;
+  color: #007bff;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  font-size: 14px;
+  padding: 0;
+  margin-top: 5px;
+  margin-bottom: 10px;
+  text-decoration: underline;
 }
 
-.chat-submit-button:hover {
-  background-color: #0056b3;
+/* Dragger (file uploader) positioning */
+.file-uploader {
+  width: 100%;
+  margin-top: auto;
 }
 
 /* Uploading Overlay */
@@ -274,6 +160,106 @@ body {
   justify-content: center;
   align-items: center;
   z-index: 10;
+}
+
+/* Chatbot */
+.chatbot-card {
+  width: 75%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chatbot-inner-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.chatbot {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chatbot h2 {
+  font-size: 1.5em;
+  color: #333;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+/* Chatbox */
+.chatbox {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.chatbox-messages {
+  flex-grow: 1;
+  padding: 15px;
+  overflow-y: auto;
+}
+
+.chatbox-input {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+}
+
+.chat-input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px 0 0 8px;
+  border: 1px solid #ced4da;
+  font-size: 16px;
+}
+
+.chat-input:focus {
+  border-color: #007bff;
+}
+
+.chat-submit-button {
+  padding: 12px 20px;
+  border-radius: 0 8px 8px 0;
+  background-color: #007bff;
+  color: white;
+  cursor: pointer;
+}
+
+.chat-submit-button:hover {
+  background-color: #0056b3;
+}
+
+/* Chat Messages */
+.chat-message {
+  margin-bottom: 10px;
+  display: flex;
+}
+
+.user-message {
+  justify-content: flex-end;
+}
+
+.user-message p {
+  background-color: #d1e7dd;
+  padding: 12px;
+  border-radius: 8px;
+  color: #155724;
+  max-width: 70%;
+}
+
+.bot-message {
+  justify-content: flex-start;
+}
+
+.bot-message p {
+  background-color: #f8d7da;
+  padding: 12px;
+  border-radius: 8px;
+  color: #721c24;
+  max-width: 70%;
 }
 
 /* Upload Progress */
@@ -305,14 +291,11 @@ body {
 @media (max-width: 767px) {
   .main-container {
     flex-direction: column;
-    align-items: center;
     height: calc(100% - 80px);
   }
 
   .sidebar-card,
   .chatbot-card {
     width: 100%;
-    max-width: 600px;
-    height: auto; /* Adjust height for mobile */
   }
 }
